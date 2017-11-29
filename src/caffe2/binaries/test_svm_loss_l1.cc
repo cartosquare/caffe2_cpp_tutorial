@@ -38,13 +38,13 @@ int main(int argc, char** argv) {
     std::cout << std::endl;
   }
 
-  std::cout << "===================================";
+  std::cout << "===================================\n";
   // create SVMLossL1 operator
   OperatorDef operator_def;
   operator_def.set_type("SVMLossL1");
   operator_def.add_input("X");
   operator_def.add_input("labels");
-  operator_def.add_output("Y");
+  operator_def.add_output("loss");
   std::unique_ptr<OperatorBase> op(CreateOperator(operator_def, &workspace));
 
   // run the operator
@@ -55,9 +55,9 @@ int main(int argc, char** argv) {
   }
 
   // get output
-  auto* Y_blob = workspace.CreateBlob("Y");
-  auto* Y_tensor = Y_blob->GetMutable<TensorCPU>();
-  float* batch_loss = Y_tensor->template mutable_data<float>();
+  auto* Y_blob = workspace.GetBlob("loss");
+  auto& Y_tensor = Y_blob->Get<TensorCPU>();
+  const float* batch_loss = Y_tensor.data<float>();
 
   std::cout << "++++++++++++++++ Loss ++++++++++++++++++++++++\n";
   for (int i = 0; i < N; ++i) {
@@ -82,6 +82,110 @@ int main(int argc, char** argv) {
   max(0, -2.85 - 0.28 + 1) + max(0, 0.86 - 0.28 + 1) = 1.58
   max(0, 4.7 - 5.5 + 1) + max(0, 6.2 - 5.5 + 1) = 1.9
   */
+
+  // calculate the average loss
+  OperatorDef avg_loss_operator_def;
+  avg_loss_operator_def.set_type("AveragedLoss");
+  avg_loss_operator_def.add_input("loss");
+  avg_loss_operator_def.add_output("avg_loss");
+  std::unique_ptr<OperatorBase> avg_loss_op(
+      CreateOperator(avg_loss_operator_def, &workspace));
+
+  // run the operator
+  status = avg_loss_op->Run();
+  if (!status) {
+    LOG(ERROR) << "run operator fail!";
+    return -1;
+  }
+  // get output
+  auto* avg_loss_blob = workspace.GetBlob("avg_loss");
+  auto& avg_loss_tensor = avg_loss_blob->Get<TensorCPU>();
+  const float* avg_loss = avg_loss_tensor.data<float>();
+  std::cout << "avg loss: " << avg_loss[0] << std::endl;
+
+  // get gradients
+  auto* avg_loss_grad_blob = workspace.CreateBlob("avg_loss_grad");
+  auto* avg_loss_grad_blob_tensor = avg_loss_grad_blob->GetMutable<TensorCPU>();
+  avg_loss_grad_blob_tensor->Resize(TIndex({1}));
+  auto* avg_loss_grad_data =
+      avg_loss_grad_blob_tensor->template mutable_data<float>();
+  avg_loss_grad_data[0] = 1;
+
+  vector<GradientWrapper> output(avg_loss_operator_def.output_size());
+  for (auto i = 0; i < output.size(); i++) {
+    output[i].dense_ = avg_loss_operator_def.output(i) + "_grad";
+  }
+  GradientOpsMeta meta = GetGradientForOp(avg_loss_operator_def, output);
+  std::cout << meta.ops_[0].type() << std::endl;
+  std::cout << "inputs: ";
+  for (int i = 0; i < meta.ops_[0].input_size(); ++i) {
+    std::cout << meta.ops_[0].input(i) << ", ";
+  }
+  std::cout << std::endl << " outputs: ";
+  for (int i = 0; i < meta.ops_[0].output_size(); ++i) {
+    std::cout << meta.ops_[0].output(i) << ", ";
+  }
+  std::cout << std::endl;
+
+  // run the operator
+  std::unique_ptr<OperatorBase> avg_loss_grad_op(
+      CreateOperator(meta.ops_[0], &workspace));
+  status = avg_loss_grad_op->Run();
+  if (!status) {
+    LOG(ERROR) << "run operator fail!";
+    return -1;
+  }
+  // get loss_grad
+  auto* loss_grad_blob = workspace.GetBlob("loss_grad");
+  auto& loss_grad_tensor = loss_grad_blob->Get<TensorCPU>();
+  const float* loss_grad = loss_grad_tensor.data<float>();
+
+  std::cout << "++++++++++++++++ Loss grad ++++++++++++++++++++++++\n";
+  std::cout << "Loss gradients\n";
+  for (int i = 0; i < N; ++i) {
+    std::cout << loss_grad[i] << ", ";
+  }
+  std::cout << std::endl;
+
+  {
+    vector<GradientWrapper> output(operator_def.output_size());
+    for (auto i = 0; i < output.size(); i++) {
+      output[i].dense_ = operator_def.output(i) + "_grad";
+    }
+    GradientOpsMeta meta = GetGradientForOp(operator_def, output);
+    std::cout << meta.ops_[0].type() << std::endl;
+    std::cout << "inputs: ";
+    for (int i = 0; i < meta.ops_[0].input_size(); ++i) {
+      std::cout << meta.ops_[0].input(i) << ", ";
+    }
+    std::cout << std::endl << " outputs: ";
+    for (int i = 0; i < meta.ops_[0].output_size(); ++i) {
+      std::cout << meta.ops_[0].output(i) << ", ";
+    }
+    std::cout << std::endl;
+
+    // run the operator
+    std::unique_ptr<OperatorBase> svmloss_gradient_op(
+        CreateOperator(meta.ops_[0], &workspace));
+    status = svmloss_gradient_op->Run();
+    if (!status) {
+      LOG(ERROR) << "run operator fail!";
+      return -1;
+    }
+    // get loss_grad
+    auto* X_grad_blob = workspace.GetBlob("X_grad");
+    auto& X_grad_tensor = X_grad_blob->Get<TensorCPU>();
+    const float* X_grad = X_grad_tensor.data<float>();
+
+    std::cout << "++++++++++++++++ X grad ++++++++++++++++++++++++\n";
+    std::cout << "X gradients\n";
+    for (int i = 0; i < N; ++i) {
+      for (int j = 0; j < D; ++j) {
+        std::cout << X_grad[i * D + j] << ", ";
+      }
+      std::cout << std::endl;
+    }
+  }
   google::protobuf::ShutdownProtobufLibrary();
   return 0;
 }
