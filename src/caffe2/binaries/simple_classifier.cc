@@ -19,7 +19,9 @@ const int D = 2;
 const int K = 3;
 
 std::string optimizer = "sgd";
-const double lr = 1;
+const double lr = 0.1;
+const int stepsize = 10;
+const float gramma = 0.999;
 const int iters = 10000;
 
 const std::string db_type = "leveldb";
@@ -125,7 +127,7 @@ void create_net(FCModel& fc_model, bool deploy = false) {
 
   std::string output_layer = fc_model.Add("data", D, K);
   if (!deploy) {
-    fc_model.AddTrainOps(output_layer, lr, optimizer);
+    fc_model.AddTrainOps(output_layer, lr, optimizer, stepsize, gramma);
   }
 
   std::cout << fc_model.Short() << std::endl;
@@ -188,7 +190,7 @@ int main(int argc, char** argv) {
   for (int i = 1; i <= iters; ++i) {
     CAFFE_ENFORCE(workspace.RunNet(predict_net.name()));
 
-    if (i % 1000 == 0) {
+    if (i % 100 == 0) {
       accuracy = caffe2::BlobUtil(*workspace.GetBlob("accuracy"))
                      .Get()
                      .data<float>()[0];

@@ -627,10 +627,10 @@ OperatorDef* NetUtil::AddAtomicIterOp(const std::string& mutex,
 
 OperatorDef* NetUtil::AddLearningRateOp(const std::string& iter,
                                         const std::string& rate,
-                                        float base_rate, float gamma) {
+                                        float base_rate, int stepsize, float gamma) {
   auto op = AddOp("LearningRate", {iter}, {rate});
   net_add_arg(*op, "policy", "step");
-  net_add_arg(*op, "stepsize", 1);
+  net_add_arg(*op, "stepsize", stepsize);
   net_add_arg(*op, "base_lr", -base_rate);
   net_add_arg(*op, "gamma", gamma);
   return op;

@@ -163,6 +163,7 @@ class NetUtil {
                                const std::string& iter);
   OperatorDef* AddLearningRateOp(const std::string& iter,
                                  const std::string& rate, float base_rate,
+                                 int stepsize = 1,
                                  float gamma = 0.999f);
   OperatorDef* AddCheckpointOp(const std::vector<std::string>& inputs,
                                int every, const std::string& db_type,

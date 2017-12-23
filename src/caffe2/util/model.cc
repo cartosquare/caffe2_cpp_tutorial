@@ -37,11 +37,11 @@ void ModelUtil::AddGradientOps() {
 }
 
 void ModelUtil::AddTrainOps(const std::string &output, float base_rate,
-                            std::string &optimizer) {
+                            std::string &optimizer, int stepsize, float gramma) {
   AddXentOps(output);
   AddGradientOps();
   AddIterOps();
-  predict.AddLearningRateOp(iter_name, lr_name, base_rate);
+  predict.AddLearningRateOp(iter_name, lr_name, base_rate, stepsize, gramma);
   AddOptimizerOps(optimizer);
 }
 

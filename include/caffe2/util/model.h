@@ -32,7 +32,7 @@ class ModelUtil {
 
   void AddTestOps(const std::string &output);
   void AddTrainOps(const std::string &output, float base_rate,
-                   std::string &optimizer);
+                   std::string &optimizer, int stepsize = 1, float gramma = 0.99);
 
   void AddFcOps(const std::string &input, const std::string &output,
                 int in_size, int out_size, bool test = false);
