@@ -208,15 +208,12 @@ int main(int argc, char** argv) {
   */
   caffe2::NetDef test_init_net, test_predict_net;
   caffe2::FCModel test_model(test_init_net, test_predict_net);
-  std::cout << "create test net ...\n";
   caffe2::create_net(test_model, true);
 
   caffe2::NetDef deploy_init_net;  // the final initialization model
   caffe2::ModelUtil deploy(deploy_init_net, test_predict_net,
                            "deploy_" + test_model.predict.net.name());
-  std::cout << "copy deploy net ...\n";
   test_model.CopyDeploy(deploy, workspace);
-  std::cout << "Deploy model dump\n";
   std::cout << deploy.Short() << std::endl;
   deploy.Write(model_output);
 
