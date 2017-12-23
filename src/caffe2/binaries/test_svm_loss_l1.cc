@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
   // get gradients
   auto* avg_loss_grad_blob = workspace.CreateBlob("avg_loss_grad");
   auto* avg_loss_grad_blob_tensor = avg_loss_grad_blob->GetMutable<TensorCPU>();
-  avg_loss_grad_blob_tensor->Resize(TIndex({1}));
+  avg_loss_grad_blob_tensor->Resize(TIndex(1));
   auto* avg_loss_grad_data =
       avg_loss_grad_blob_tensor->template mutable_data<float>();
   avg_loss_grad_data[0] = 1;
