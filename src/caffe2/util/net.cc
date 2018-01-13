@@ -1182,6 +1182,15 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
   // Currently, only support single input/output ops and input name == output
   // name
   std::vector<std::string> can_merge_ops = {"Relu"};
+  // paired10 color scheme
+  // #a6cee3, #1f78b4, #b2df8a, #33a02c, #fb9a99,
+  // #e31a1c, #fdbf6f, #ff7f00, #cab2d6, #6a3d9a
+  std::vector<std::pair<std::string, std::string>> op_color_map = {
+      {"Conv", "#b2df8a"},
+      {"LRN", "#1f78b4"},
+      {"MaxPool", "#cab2d6"},
+      {"FC", "#ff7f00"},
+      {"Dropout", "#fdbf6f"}};
 
   std::ofstream file(path);
   if (file.is_open()) {
@@ -1198,7 +1207,6 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
 
     // Net Archetecture
     file << "subgraph cluster_0 {" << std::endl;
-    file << '\t' << "node [shape=box,color=\"#7fc97f\",style=filled];\n";
     for (const auto& op : net.op()) {
       if (std::find(skip_ops.begin(), skip_ops.end(), op.type()) !=
           skip_ops.end()) {
@@ -1219,21 +1227,62 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
           continue;
         }
         auto name = op_type + '_' + std::to_string(index++);
-        // file << ' ' << name;
 
         for (const auto& output : op.output()) {
           output_op_map.insert(std::make_pair(output, name));
         }
       }
     }
-    // file << ';' << std::endl;
+
+    index = 0;
+    for (const auto& op : net.op()) {
+      auto op_type = op.type();
+      if (std::find(skip_ops.begin(), skip_ops.end(), op.type()) !=
+          skip_ops.end()) {
+        continue;
+      }
+      if (is_gradient_op(op_type)) {
+        continue;
+      }
+      if (std::find(can_merge_ops.begin(), can_merge_ops.end(), op_type) !=
+          can_merge_ops.end()) {
+        index++;
+        continue;
+      }
+      auto op_name = op_type + '_' + std::to_string(index++);
+      bool found = false;
+      for (auto color_iter = op_color_map.begin();
+           color_iter != op_color_map.end(); ++color_iter) {
+        if (color_iter->first == op_type) {
+          file << '\t'
+               << "node [shape=box,color=\"" + color_iter->second +
+                      "\",style=filled];\n";
+          if (name_map.find(op_name) == name_map.end()) {
+            file << '"' << op_name << '"';
+          } else {
+            file << '"' << name_map.at(op_name) << '"';
+          }
+          file << std::endl;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        file << '\t' << "node [shape=box,color=\"#7fc97f\",style=filled];\n";
+        if (name_map.find(op_name) == name_map.end()) {
+          file << '"' << op_name << '"';
+        } else {
+          file << '"' << name_map.at(op_name) << '"';
+        }
+        file << std::endl;
+      }
+    }
+
     file << "label=\"Net Archetecture\";" << std::endl;
     file << "labeljust=l;" << std::endl;
     file << "fontsize=20;" << std::endl;
     file << "fontname=\"Times-Bold\";" << std::endl;
 
-    index = 0;
-    // file << '\t' << "node [shape=oval,color=lightpink,style=filled];";
     index = 0;
     for (const auto& op : net.op()) {
       if (std::find(skip_ops.begin(), skip_ops.end(), op.type()) !=
@@ -1284,7 +1333,6 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
     file << "fontsize=20;" << std::endl;
     file << "fontname=\"Times-Bold\";" << std::endl;
 
-    index = 0;
     file << '\t' << "node [shape=oval,color=\"#beaed4\",style=filled];";
     index = 0;
     for (const auto& op : net.op()) {
