@@ -7,6 +7,8 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/text_format.h>
 
+#include <map>
+
 namespace caffe2 {
 
 const std::set<std::string> trainable_ops({
@@ -37,8 +39,16 @@ const std::set<std::string> trainable_ops({
 });
 
 const std::set<std::string> non_trainable_ops({
-    "Accuracy", "Cast", "Cout", "ConstantFill", "Iter", "Scale", "StopGradient",
-    "TensorProtosDBInput", "TimePlot", "ShowWorst",
+    "Accuracy",
+    "Cast",
+    "Cout",
+    "ConstantFill",
+    "Iter",
+    "Scale",
+    "StopGradient",
+    "TensorProtosDBInput",
+    "TimePlot",
+    "ShowWorst",
 });
 
 const std::map<std::string, std::string> custom_gradient({
@@ -47,8 +57,15 @@ const std::map<std::string, std::string> custom_gradient({
 });
 
 const std::set<std::string> filler_ops({
-    "UniformFill", "UniformIntFill", "UniqueUniformFill", "ConstantFill",
-    "GaussianFill", "XavierFill", "MSRAFill", "RangeFill", "LengthsRangeFill",
+    "UniformFill",
+    "UniformIntFill",
+    "UniqueUniformFill",
+    "ConstantFill",
+    "GaussianFill",
+    "XavierFill",
+    "MSRAFill",
+    "RangeFill",
+    "LengthsRangeFill",
 });
 
 const std::set<std::string> non_inplace_ops({
@@ -627,7 +644,8 @@ OperatorDef* NetUtil::AddAtomicIterOp(const std::string& mutex,
 
 OperatorDef* NetUtil::AddLearningRateOp(const std::string& iter,
                                         const std::string& rate,
-                                        float base_rate, int stepsize, float gamma) {
+                                        float base_rate, int stepsize,
+                                        float gamma) {
   auto op = AddOp("LearningRate", {iter}, {rate});
   net_add_arg(*op, "policy", "step");
   net_add_arg(*op, "stepsize", stepsize);
@@ -1121,7 +1139,7 @@ OperatorDef* NetUtil::AddRecurrentNetworkOp(const std::string& seq_lengths,
 size_t NetUtil::WriteGraph(const std::string& path) const {
   std::ofstream file(path);
   if (file.is_open()) {
-    file << "digraph {" << std::endl;
+    file << "digraph{" << std::endl;
     auto index = 0;
     file << '\t' << "node [shape=box,color=lightblue,style=filled];";
     for (const auto& op : net.op()) {
@@ -1148,6 +1166,160 @@ size_t NetUtil::WriteGraph(const std::string& path) const {
     file << "}" << std::endl;
     file.close();
   }
+  return std::ifstream(path, std::ifstream::ate | std::ifstream::binary)
+      .tellg();
+}
+
+bool is_gradient_op(std::string op_type) {
+  return (op_type.find("Gradient") != std::string::npos ||
+          op_type.find("Grad") != std::string::npos);
+}
+
+size_t NetUtil::WriteNiceGraph(const std::string& path) const {
+  // Do not show these ops in the graph
+  std::vector<std::string> skip_ops = {"Adam", "TimePlot", "Iter",
+                                       "LearningRate"};
+  // Currently, only support single input/output ops and input name == output
+  // name
+  std::vector<std::string> can_merge_ops = {"Relu"};
+
+  std::ofstream file(path);
+  if (file.is_open()) {
+    file << "digraph{" << std::endl;
+    // file << "rankdir=LR;" << std::endl;
+    file << "nodesep=0.25;" << std::endl;
+    file << "ranksep=.75;" << std::endl;
+
+    auto index = 0;
+    // Map output blob to its op name
+    std::map<std::string, std::string> output_op_map;
+    // Some op in graph is merged by several ops, name_map remember it
+    std::map<std::string, std::string> name_map;
+
+    // Net Archetecture
+    file << "subgraph cluster_0 {" << std::endl;
+    file << '\t' << "node [shape=box,color=\"#7fc97f\",style=filled];\n";
+    for (const auto& op : net.op()) {
+      if (std::find(skip_ops.begin(), skip_ops.end(), op.type()) !=
+          skip_ops.end()) {
+        continue;
+      }
+      std::string op_type = op.type();
+      if (!is_gradient_op(op_type)) {
+        // we merge ops that products same output
+        if (std::find(can_merge_ops.begin(), can_merge_ops.end(), op_type) !=
+                can_merge_ops.end() &&
+            output_op_map.find(op.input(0)) != output_op_map.end()) {
+          std::string bottom_layer = output_op_map.at(op.input(0));
+          output_op_map.at(op.input(0)) =
+              bottom_layer + " & " + op_type + std::to_string(index++);
+          name_map.insert(
+              std::make_pair(bottom_layer, output_op_map.at(op.input(0))));
+
+          continue;
+        }
+        auto name = op_type + '_' + std::to_string(index++);
+        // file << ' ' << name;
+
+        for (const auto& output : op.output()) {
+          output_op_map.insert(std::make_pair(output, name));
+        }
+      }
+    }
+    // file << ';' << std::endl;
+    file << "label=\"Net Archetecture\";" << std::endl;
+    file << "labeljust=l;" << std::endl;
+    file << "fontsize=20;" << std::endl;
+    file << "fontname=\"Times-Bold\";" << std::endl;
+
+    index = 0;
+    // file << '\t' << "node [shape=oval,color=lightpink,style=filled];";
+    index = 0;
+    for (const auto& op : net.op()) {
+      if (std::find(skip_ops.begin(), skip_ops.end(), op.type()) !=
+          skip_ops.end()) {
+        continue;
+      }
+      std::string op_type = op.type();
+      if (is_gradient_op(op_type)) {
+        continue;
+      }
+      auto name = op.type() + '_' + std::to_string(index++);
+      if (std::find(can_merge_ops.begin(), can_merge_ops.end(), op.type()) !=
+          can_merge_ops.end()) {
+        continue;
+      }
+      for (const auto& input : op.input()) {
+        if (output_op_map.find(input) == output_op_map.end()) {
+          // std::cout << "Warning: " << input << " not find!";
+          continue;
+        }
+        if (name_map.find(name) != name_map.end()) {
+          name = name_map.at(name);
+        }
+        file << '\t' << '"' << output_op_map.at(input) << '"' << " -> " << '"'
+             << name << '"' << ';' << std::endl;
+      }
+    }
+    file << "}" << std::endl;
+
+    index = 0;
+    file << "subgraph cluster_1 {" << std::endl;
+    // file << "rankdir=BT;" << std::endl;
+    file << '\t' << "node [shape=box,color=\"#fdc086\",style=filled];\n";
+    for (const auto& op : net.op()) {
+      if (std::find(skip_ops.begin(), skip_ops.end(), op.type()) !=
+          skip_ops.end()) {
+        continue;
+      }
+      std::string op_type = op.type();
+      if (is_gradient_op(op_type)) {
+        auto name = op_type + '_' + std::to_string(index++);
+        file << ' ' << name;
+      }
+    }
+    file << ';' << std::endl;
+    file << "label=\"Net SGD\"" << std::endl;
+    file << "labeljust=l;" << std::endl;
+    file << "fontsize=20;" << std::endl;
+    file << "fontname=\"Times-Bold\";" << std::endl;
+
+    index = 0;
+    file << '\t' << "node [shape=oval,color=\"#beaed4\",style=filled];";
+    index = 0;
+    for (const auto& op : net.op()) {
+      if (std::find(skip_ops.begin(), skip_ops.end(), op.type()) !=
+          skip_ops.end()) {
+        continue;
+      }
+      std::string op_type = op.type();
+      if (!is_gradient_op(op_type)) {
+        continue;
+      }
+      auto name = op.type() + '_' + std::to_string(index++);
+      for (const auto& input : op.input()) {
+        // wire from NetArchetecture to NetSGD
+        if (index == 1) {
+          if (output_op_map.find(input) == output_op_map.end()) {
+            continue;
+          }
+          file << '\t' << '"' << output_op_map.at(input) << '"' << " -> " << '"'
+               << input << '"' << ';' << std::endl;
+        }
+        file << '\t' << '"' << input << '"' << " -> " << '"' << name << '"'
+             << ';' << std::endl;
+      }
+      for (const auto& output : op.output()) {
+        file << '\t' << '"' << name << '"' << " -> " << '"' << output << '"'
+             << ';' << std::endl;
+      }
+    }
+    file << "}" << std::endl;
+
+    file << "}" << std::endl;
+    file.close();
+  }
+
   return std::ifstream(path, std::ifstream::ate | std::ifstream::binary)
       .tellg();
 }

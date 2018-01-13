@@ -204,6 +204,7 @@ class NetUtil {
   size_t Write(const std::string& path) const;
   size_t WriteText(const std::string& path) const;
   size_t WriteGraph(const std::string& path) const;
+  size_t WriteNiceGraph(const std::string& path) const;
   size_t Read(const std::string& path);
 
   void SetDeviceCUDA();

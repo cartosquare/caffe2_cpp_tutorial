@@ -9,3 +9,5 @@ include/res
 data
 output
 .vscode
+
+models/

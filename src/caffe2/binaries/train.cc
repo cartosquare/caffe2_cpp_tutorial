@@ -29,6 +29,7 @@ CAFFE2_DEFINE_bool(display, false,
                    "Show worst correct and incorrect classification.");
 CAFFE2_DEFINE_bool(reshape, false, "Reshape output (necessary for squeeznet)");
 CAFFE2_DEFINE_bool(matrix, false, "Show test result matrix");
+CAFFE2_DEFINE_bool(no_run, false, "Run actually run training");
 
 #include "caffe2/util/cmd.h"
 
@@ -120,6 +121,7 @@ void run() {
   NetDef full_init_model, full_predict_model;
   ModelUtil full(full_init_model, full_predict_model);
   Keeper(FLAGS_model).AddModel(full, has_split, class_labels.size());
+  std::cout << full.Short() << std::endl; 
 
   if (FLAGS_device == "cudnn") {
     full.init.SetEngineOps("CUDNN");
@@ -223,7 +225,13 @@ void run() {
     std::cout << models[kRunTrain].Short();
   }
 
+  std::string graph_output_prefix = "models/" + FLAGS_model;
+  models[kRunTrain].predict.WriteNiceGraph(graph_output_prefix + ".dot");
+
   std::cout << std::endl;
+  if (FLAGS_no_run) {
+    return;
+  }
 
   Workspace workspace("tmp");
 
