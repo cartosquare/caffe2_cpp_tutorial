@@ -151,12 +151,17 @@ Argument* net_add_arg(OperatorDef& op, const std::string& name,
   return arg;
 }
 
+void set_name(OperatorDef* op, const std::string& name) {
+  op->set_name(op->type() + "[" + name + "]");
+}
 // I/O
 
 OperatorDef* NetUtil::AddCreateDbOp(const std::string& reader,
                                     const std::string& db_type,
                                     const std::string& db_path) {
   auto op = AddOp("CreateDB", {}, {reader});
+  set_name(op, reader);
+
   net_add_arg(*op, "db_type", db_type);
   net_add_arg(*op, "db", db_path);
   return op;
@@ -167,17 +172,24 @@ OperatorDef* NetUtil::AddTensorProtosDbInputOp(const std::string& reader,
                                                const std::string& label,
                                                int batch_size) {
   auto op = AddOp("TensorProtosDBInput", {reader}, {data, label});
+  set_name(op, data);
+
   net_add_arg(*op, "batch_size", batch_size);
   return op;
 }
 
 OperatorDef* NetUtil::AddCoutOp(const std::vector<std::string>& params) {
-  return AddOp("Cout", params, {});
+  auto op = AddOp("Cout", params, {});
+  set_name(op, "");
+  return op;
 }
 
 OperatorDef* NetUtil::AddZeroOneOp(const std::string& pred,
                                    const std::string& label) {
-  return AddOp("ZeroOne", {pred, label}, {});
+  auto op = AddOp("ZeroOne", {pred, label}, {});
+  set_name(op, "");
+  return op;
+  
 }
 
 OperatorDef* NetUtil::AddShowWorstOp(const std::string& pred,
@@ -185,6 +197,7 @@ OperatorDef* NetUtil::AddShowWorstOp(const std::string& pred,
                                      const std::string& data, float scale,
                                      float mean) {
   auto op = AddOp("ShowWorst", {pred, label, data}, {});
+  set_name(op, "");
   net_add_arg(*op, "scale", scale);
   net_add_arg(*op, "mean", mean);
   return op;
@@ -223,7 +236,9 @@ OperatorDef* NetUtil::AddCopyFromCpuInputOp(const std::string& input,
 
 OperatorDef* NetUtil::AddCopyOp(const std::string& input,
                                 const std::string& output) {
-  return AddOp("Copy", {input}, {output});
+  auto op = AddOp("Copy", {input}, {output});
+  set_name(op, output);
+  return op;
 }
 
 OperatorDef* NetUtil::AddCreateMutexOp(const std::string& param) {
@@ -251,6 +266,8 @@ OperatorDef* NetUtil::AddSummarizeOp(const std::string& param, bool to_file) {
 OperatorDef* NetUtil::AddConstantFillOp(const std::vector<int>& shape,
                                         const std::string& param) {
   auto op = AddOp("ConstantFill", {}, {param});
+  set_name(op, param);
+
   net_add_arg(*op, "shape", shape);
   return op;
 }
@@ -293,6 +310,8 @@ OperatorDef* NetUtil::AddConstantFillWithOp(float value,
                                             const std::string& input,
                                             const std::string& output) {
   auto op = AddOp("ConstantFill", {input}, {output});
+  set_name(op, output);
+
   net_add_arg(*op, "value", value);
   return op;
 }
@@ -328,6 +347,8 @@ OperatorDef* NetUtil::AddConvOp(const std::string& input, const std::string& w,
                   b.size() ? std::vector<std::string>({input, w, b})
                            : std::vector<std::string>({input, w}),
                   {output});
+  set_name(op, output);
+  
   net_add_arg(*op, "stride", stride);
   net_add_arg(*op, "pad", padding);
   net_add_arg(*op, "kernel", kernel);
@@ -337,7 +358,9 @@ OperatorDef* NetUtil::AddConvOp(const std::string& input, const std::string& w,
 
 OperatorDef* NetUtil::AddReluOp(const std::string& input,
                                 const std::string& output) {
-  return AddOp("Relu", {input}, {output});
+  auto op = AddOp("Relu", {input}, {output});
+  set_name(op, output);
+  return op;
 }
 
 OperatorDef* NetUtil::AddLrnOp(const std::string& input,
@@ -345,6 +368,8 @@ OperatorDef* NetUtil::AddLrnOp(const std::string& input,
                                float beta, float bias,
                                const std::string& order) {
   auto op = AddOp("LRN", {input}, {output, "_" + output + "_scale"});
+  set_name(op, output);
+
   net_add_arg(*op, "size", size);
   net_add_arg(*op, "alpha", alpha);
   net_add_arg(*op, "beta", beta);
@@ -358,6 +383,8 @@ OperatorDef* NetUtil::AddMaxPoolOp(const std::string& input,
                                    int padding, int kernel,
                                    const std::string& order) {
   auto op = AddOp("MaxPool", {input}, {output});
+  set_name(op, output);
+
   net_add_arg(*op, "stride", stride);
   net_add_arg(*op, "pad", padding);
   net_add_arg(*op, "kernel", kernel);
@@ -371,6 +398,8 @@ OperatorDef* NetUtil::AddAveragePoolOp(const std::string& input,
                                        int padding, int kernel,
                                        const std::string& order) {
   auto op = AddOp("AveragePool", {input}, {output});
+  set_name(op, output);
+
   net_add_arg(*op, "stride", stride);
   net_add_arg(*op, "pad", padding);
   net_add_arg(*op, "kernel", kernel);
@@ -383,6 +412,8 @@ OperatorDef* NetUtil::AddFcOp(const std::string& input, const std::string& w,
                               const std::string& b, const std::string& output,
                               int axis) {
   auto op = AddOp("FC", {input, w, b}, {output});
+  set_name(op, output);
+
   if (axis != 1) {
     net_add_arg(*op, "axis", axis);
   }
@@ -392,6 +423,8 @@ OperatorDef* NetUtil::AddFcOp(const std::string& input, const std::string& w,
 OperatorDef* NetUtil::AddDropoutOp(const std::string& input,
                                    const std::string& output, float ratio) {
   auto op = AddOp("Dropout", {input}, {output, "_" + output + "_mask"});
+  set_name(op, output);
+
   net_add_arg(*op, "ratio", ratio);
   net_add_arg(*op, "is_test", 1);  // TODO
   return op;
@@ -400,6 +433,8 @@ OperatorDef* NetUtil::AddDropoutOp(const std::string& input,
 OperatorDef* NetUtil::AddSoftmaxOp(const std::string& input,
                                    const std::string& output, int axis) {
   auto op = AddOp("Softmax", {input}, {output});
+  set_name(op, output);
+
   if (axis != 1) {
     net_add_arg(*op, "axis", axis);
   }
@@ -410,6 +445,8 @@ OperatorDef* NetUtil::AddConcatOp(const std::vector<std::string>& inputs,
                                   const std::string& output,
                                   const std::string& order) {
   auto op = AddOp("Concat", inputs, {output, "_" + output + "_dims"});
+  set_name(op, output);
+
   net_add_arg(*op, "order", order);
   return op;
 }
@@ -428,7 +465,9 @@ OperatorDef* NetUtil::AddSpatialBNOp(const std::vector<std::string>& inputs,
 
 OperatorDef* NetUtil::AddSumOp(const std::vector<std::string>& inputs,
                                const std::string& sum) {
-  return AddOp("Sum", inputs, {sum});
+  auto op = AddOp("Sum", inputs, {sum});
+  set_name(op, sum);
+  return op;
 }
 
 OperatorDef* NetUtil::AddMulOp(const std::vector<std::string>& inputs,
@@ -464,6 +503,8 @@ OperatorDef* NetUtil::AddAccuracyOp(const std::string& pred,
                                     const std::string& label,
                                     const std::string& accuracy, int top_k) {
   auto op = AddOp("Accuracy", {pred, label}, {accuracy});
+  set_name(op, accuracy);
+
   if (top_k) {
     net_add_arg(*op, "top_k", top_k);
   }
@@ -473,12 +514,17 @@ OperatorDef* NetUtil::AddAccuracyOp(const std::string& pred,
 OperatorDef* NetUtil::AddLabelCrossEntropyOp(const std::string& pred,
                                              const std::string& label,
                                              const std::string& xent) {
-  return AddOp("LabelCrossEntropy", {pred, label}, {xent});
+  auto op = AddOp("LabelCrossEntropy", {pred, label}, {xent});
+  op->set_name("LabelCrossEntropy");
+  set_name(op, xent);
+  return op;
 }
 
 OperatorDef* NetUtil::AddAveragedLossOp(const std::string& input,
                                         const std::string& loss) {
-  return AddOp("AveragedLoss", {input}, {loss});
+  auto op = AddOp("AveragedLoss", {input}, {loss});
+  set_name(op, loss);
+  return op;
 }
 
 OperatorDef* NetUtil::AddDiagonalOp(const std::string& input,
@@ -1172,7 +1218,9 @@ size_t NetUtil::WriteGraph(const std::string& path) const {
 
 bool is_gradient_op(std::string op_type) {
   return (op_type.find("Gradient") != std::string::npos ||
-          op_type.find("Grad") != std::string::npos);
+          op_type.find("Grad") != std::string::npos || 
+          op_type.find("Sum") != std::string::npos || 
+          op_type.find("Split") != std::string::npos);
 }
 
 size_t NetUtil::WriteNiceGraph(const std::string& path) const {
@@ -1189,8 +1237,10 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
       {"Conv", "#b2df8a"},
       {"LRN", "#1f78b4"},
       {"MaxPool", "#cab2d6"},
+      {"AveragePool", "#e31a1c"},
       {"FC", "#ff7f00"},
-      {"Dropout", "#fdbf6f"}};
+      {"Dropout", "#fdbf6f"},
+      {"Concat", "#33a02c"}};
 
   std::ofstream file(path);
   if (file.is_open()) {
@@ -1219,15 +1269,17 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
                 can_merge_ops.end() &&
             output_op_map.find(op.input(0)) != output_op_map.end()) {
           std::string bottom_layer = output_op_map.at(op.input(0));
-          output_op_map.at(op.input(0)) =
-              bottom_layer + " & " + op_type + std::to_string(index++);
-          name_map.insert(
-              std::make_pair(bottom_layer, output_op_map.at(op.input(0))));
+          name_map.at(bottom_layer) += " & " + op_type;
+          index++;
 
           continue;
         }
         auto name = op_type + '_' + std::to_string(index++);
-
+        if (op.name() != "") {
+          name_map.insert(std::make_pair(name, op.name()));
+        } else {
+          std::cout << "Name of " << op_type << " is empty" << std::endl;
+        }
         for (const auto& output : op.output()) {
           output_op_map.insert(std::make_pair(output, name));
         }
@@ -1293,6 +1345,7 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
       if (is_gradient_op(op_type)) {
         continue;
       }
+      // Note: we must increase idnex before skip merge ops
       auto name = op.type() + '_' + std::to_string(index++);
       if (std::find(can_merge_ops.begin(), can_merge_ops.end(), op.type()) !=
           can_merge_ops.end()) {
@@ -1303,15 +1356,24 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
           // std::cout << "Warning: " << input << " not find!";
           continue;
         }
+        std::string to_name = name;
         if (name_map.find(name) != name_map.end()) {
-          name = name_map.at(name);
+          to_name = name_map.at(name);
+        } else {
+          std::cout << "no name for to " << name << std::endl;
         }
-        file << '\t' << '"' << output_op_map.at(input) << '"' << " -> " << '"'
-             << name << '"' << ';' << std::endl;
+        std::string from_name = output_op_map.at(input);
+        if (name_map.find(from_name) != name_map.end()) {
+          from_name = name_map.at(from_name);
+        } else {
+          std::cout << "no name for from " << from_name << std::endl;
+        }
+        file << '\t' << '"' << from_name << '"' << " -> " << '"'
+             << to_name << '"' << ';' << std::endl;
       }
     }
+    
     file << "}" << std::endl;
-
     index = 0;
     file << "subgraph cluster_1 {" << std::endl;
     // file << "rankdir=BT;" << std::endl;
@@ -1351,7 +1413,7 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
           if (output_op_map.find(input) == output_op_map.end()) {
             continue;
           }
-          file << '\t' << '"' << output_op_map.at(input) << '"' << " -> " << '"'
+          file << '\t' << '"' << name_map.at(output_op_map.at(input)) << '"' << " -> " << '"'
                << input << '"' << ';' << std::endl;
         }
         file << '\t' << '"' << input << '"' << " -> " << '"' << name << '"'
@@ -1363,7 +1425,6 @@ size_t NetUtil::WriteNiceGraph(const std::string& path) const {
       }
     }
     file << "}" << std::endl;
-
     file << "}" << std::endl;
     file.close();
   }
